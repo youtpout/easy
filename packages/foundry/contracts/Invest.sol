@@ -55,6 +55,7 @@ contract Invest is EasyNFT {
 
     function InvestNative(
         address counterPart,
+              uint256 amountIn,
         uint256 amountOutMin,
         uint24 fee,
         int24 tickLower,
@@ -74,7 +75,7 @@ contract Invest is EasyNFT {
         _swapExactInputSingleHop(
             address(weth),
             counterPart,
-            amountInvested,
+            amountIn,
             amountOutMin,
             fee
         );
@@ -107,6 +108,7 @@ contract Invest is EasyNFT {
     function InvestToken(
         address token,
         uint256 amount,
+        uint256 amountIn,
         uint256 amountOutMin,
         address counterPart,
         uint24 fee,
@@ -126,7 +128,7 @@ contract Invest is EasyNFT {
         _swapExactInputSingleHop(
             address(token),
             counterPart,
-            amountInvested,
+            amountIn,
             amountOutMin,
             fee
         );
