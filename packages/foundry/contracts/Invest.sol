@@ -3,15 +3,15 @@ pragma solidity >=0.8.0 <0.9.0;
 
 // Useful for debugging. Remove when deploying to a live network.
 import "forge-std/console.sol";
+import "./EasyNFT.sol";
 
 /**
  * A smart contract that allows changing a state variable of the contract and tracking the changes
  * It also allows the owner to withdraw the Ether in the contract
  * @author BuidlGuidl
  */
-contract Invest {
+contract Invest is EasyNFT {
     // State Variables
-    address public immutable owner;
     IWETH public immutable weth;
     ISwapRouter02 public immutable router;
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
@@ -22,6 +22,7 @@ contract Invest {
         address indexed token,
         address indexed investor,
         uint256 indexed tokenId,
+        uint256 tokenIdPosition,
         uint256 amount
     );
 
@@ -39,9 +40,8 @@ contract Invest {
         address _router,
         address _nonfungiblePositionManager,
         uint256 _fees
-    ) {
+    ) EasyNFT(_owner) {
         require(_fees < 100, "Fees can't be more than 1 %");
-        owner = _owner;
         weth = IWETH(_weth);
         router = ISwapRouter02(_router);
         nonfungiblePositionManager = INonfungiblePositionManager(
@@ -55,12 +55,13 @@ contract Invest {
         uint256 amountOutMin,
         uint24 fee,
         int24 tickLower,
-        int24 tickUpper
+        int24 tickUpper,
+        address receiver
     ) public payable returns (uint256) {
         uint256 platformFees = 0;
         if (fees > 0) {
             platformFees = (msg.value * fees) / 10_000;
-            (bool sent, ) = owner.call{value: platformFees}("");
+            (bool sent, ) = owner().call{value: platformFees}("");
             require(sent, "Failed to send Ether");
         }
         uint256 amountInvested = msg.value - platformFees;
@@ -75,7 +76,7 @@ contract Invest {
             fee
         );
 
-        (uint256 tokenId, , , ) = _mintNewPosition(
+        (uint256 tokenIdPosition, , , ) = _mintNewPosition(
             address(weth),
             counterPart,
             tickLower,
@@ -85,7 +86,15 @@ contract Invest {
             amountOutMin
         );
 
-        emit Invested(address(weth), msg.sender, tokenId, msg.value);
+        uint256 tokenId = safeMint(receiver, tokenIdPosition);
+
+        emit Invested(
+            address(weth),
+            receiver,
+            tokenId,
+            tokenIdPosition,
+            msg.value
+        );
 
         return tokenId;
     }
@@ -97,13 +106,14 @@ contract Invest {
         address counterPart,
         uint24 fee,
         int24 tickLower,
-        int24 tickUpper
+        int24 tickUpper,
+        address receiver
     ) public returns (uint256) {
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         uint256 platformFees = 0;
         if (fees > 0) {
             platformFees = (amount * fees) / 10_000;
-            IERC20(token).transfer(owner, platformFees);
+            IERC20(token).transfer(owner(), platformFees);
         }
         uint256 amountInvested = amount - platformFees;
 
@@ -116,7 +126,7 @@ contract Invest {
             fee
         );
 
-        (uint256 tokenId, , , ) = _mintNewPosition(
+        (uint256 tokenIdPosition, , , ) = _mintNewPosition(
             token,
             counterPart,
             tickLower,
@@ -126,7 +136,9 @@ contract Invest {
             amountOutMin
         );
 
-        emit Invested(token, msg.sender, tokenId, amount);
+        uint256 tokenId = safeMint(receiver, tokenIdPosition);
+
+        emit Invested(token, receiver, tokenId, tokenIdPosition, amount);
 
         return tokenId;
     }
