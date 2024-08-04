@@ -18,6 +18,8 @@ contract Invest is EasyNFT {
     // 10_000 = 100%
     uint256 public fees;
 
+    mapping(uint256 => address) collectedToken;
+
     event Invested(
         address indexed token,
         address indexed investor,
@@ -27,8 +29,9 @@ contract Invest is EasyNFT {
     );
 
     event Closed(
-        address indexed tokenId,
+        uint256 indexed tokenId,
         address indexed receiver,
+        uint256 tokenIdPosition,
         uint256 amount
     );
 
@@ -96,6 +99,8 @@ contract Invest is EasyNFT {
             msg.value
         );
 
+        collectedToken[tokenId] = address(weth);
+
         return tokenId;
     }
 
@@ -140,7 +145,130 @@ contract Invest is EasyNFT {
 
         emit Invested(token, receiver, tokenId, tokenIdPosition, amount);
 
+        collectedToken[tokenId] = address(token);
+
         return tokenId;
+    }
+
+    function close(uint256 tokenId) external {
+        address owner = ownerOf(tokenId);
+        require(msg.sender == owner, "You can't close this position ");
+        uint256 positionId = linkedPosition[tokenId];
+
+        _closePosition(tokenId, positionId, owner);
+    }
+
+    function botClose(uint256 tokenId) external {
+        address owner = ownerOf(tokenId);
+        uint256 positionId = linkedPosition[tokenId];
+        (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        ) = nonfungiblePositionManager.positions(tokenId);
+
+        address factory = router.factory();
+        address pool = IUniswapV3Factory(factory).getPool(token0, token1, fee);
+        IUniswapV3Pool.Slot0 memory slot = IUniswapV3Pool(pool).slot0();
+        int24 currentTick = slot.tick;
+
+        // todo check if tick negative or positive maybe
+        bool canClose = currentTick < tickLower || currentTick > tickUpper;
+
+        require(canClose, "Position stays active");
+
+        _closePosition(tokenId, positionId, owner);
+    }
+
+    function _closePosition(
+        uint256 tokenId,
+        uint256 positionId,
+        address receiver
+    ) private {
+        uint256 positionId = linkedPosition[tokenId];
+        (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        ) = nonfungiblePositionManager.positions(tokenId);
+
+        INonfungiblePositionManager.CollectParams
+            memory params = INonfungiblePositionManager.CollectParams({
+                tokenId: tokenId,
+                recipient: address(this),
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            });
+
+        nonfungiblePositionManager.collect(params);
+
+        INonfungiblePositionManager.DecreaseLiquidityParams
+            memory paramsDecrease = INonfungiblePositionManager
+                .DecreaseLiquidityParams({
+                    tokenId: tokenId,
+                    liquidity: liquidity,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    deadline: block.timestamp
+                });
+
+        nonfungiblePositionManager.decreaseLiquidity(paramsDecrease);
+
+        address tokenOut = collectedToken[tokenId];
+        require(
+            tokenOut == token0 || tokenOut == token1,
+            "Incorrect out token"
+        );
+
+        // reswap in collected amount
+        if (tokenOut == token0) {
+            _swapExactInputSingleHop(
+                token1,
+                token0,
+                IERC20(token1).balanceOf(address(this)),
+                1,
+                fee
+            );
+        } else {
+            _swapExactInputSingleHop(
+                token0,
+                token1,
+                IERC20(token0).balanceOf(address(this)),
+                1,
+                fee
+            );
+        }
+
+        uint256 amount = IERC20(tokenOut).balanceOf(address(this));
+
+        // send collected feed back to owner
+        if (tokenOut == address(weth)) {
+            weth.withdraw(amount);
+            (bool sent, ) = receiver.call{value: amount}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            IERC20(tokenOut).transfer(receiver, amount);
+        }
+
+        emit Closed(tokenId, receiver, positionId, amount);
     }
 
     function _swapExactInputSingleHop(
@@ -246,6 +374,8 @@ interface ISwapRouter02 {
     function exactOutputSingle(
         ExactOutputSingleParams calldata params
     ) external payable returns (uint256 amountIn);
+
+    function factory() external pure returns (address);
 }
 
 interface IERC20 {
@@ -273,6 +403,26 @@ interface IWETH is IERC20 {
 }
 
 interface IUniswapV3Pool {
+    struct Slot0 {
+        // the current price
+        uint160 sqrtPriceX96;
+        // the current tick
+        int24 tick;
+        // the most-recently updated index of the observations array
+        uint16 observationIndex;
+        // the current maximum number of observations that are being stored
+        uint16 observationCardinality;
+        // the next maximum number of observations to store, triggered in observations.write
+        uint16 observationCardinalityNext;
+        // the current protocol fee as a percentage of the swap fee taken on withdrawal
+        // represented as an integer denominator (1/x)%
+        uint8 feeProtocol;
+        // whether the pool is locked
+        bool unlocked;
+    }
+
+    function slot0() external returns (Slot0 memory);
+
     function mint(
         address recipient,
         int24 tickLower,
@@ -316,4 +466,47 @@ interface INonfungiblePositionManager {
             uint256 amount0,
             uint256 amount1
         );
+
+    function positions(
+        uint256 tokenId
+    )
+        external
+        view
+        returns (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        );
+
+    struct DecreaseLiquidityParams {
+        uint256 tokenId;
+        uint128 liquidity;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        uint256 deadline;
+    }
+
+    function decreaseLiquidity(
+        DecreaseLiquidityParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
+
+    struct CollectParams {
+        uint256 tokenId;
+        address recipient;
+        uint128 amount0Max;
+        uint128 amount1Max;
+    }
+
+    function collect(
+        CollectParams calldata params
+    ) external payable returns (uint256 amount0, uint256 amount1);
 }
