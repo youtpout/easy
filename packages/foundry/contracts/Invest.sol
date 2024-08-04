@@ -25,6 +25,12 @@ contract Invest {
         uint256 amount
     );
 
+    event Closed(
+        address indexed tokenId,
+        address indexed receiver,
+        uint256 amount
+    );
+
     // Constructor: Called once on contract deployment
     // Check packages/foundry/deploy/Deploy.s.sol
     constructor(
@@ -79,6 +85,8 @@ contract Invest {
             amountOutMin
         );
 
+        emit Invested(address(weth), msg.sender, tokenId, msg.value);
+
         return tokenId;
     }
 
@@ -109,7 +117,7 @@ contract Invest {
         );
 
         (uint256 tokenId, , , ) = _mintNewPosition(
-            address(weth),
+            token,
             counterPart,
             tickLower,
             tickUpper,
@@ -117,6 +125,8 @@ contract Invest {
             amountInvested,
             amountOutMin
         );
+
+        emit Invested(token, msg.sender, tokenId, amount);
 
         return tokenId;
     }
