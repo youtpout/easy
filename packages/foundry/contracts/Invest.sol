@@ -14,6 +14,7 @@ contract Invest {
     address public immutable owner;
     IWETH public immutable weth;
     ISwapRouter02 public immutable router;
+    INonfungiblePositionManager public immutable nonfungiblePositionManager;
     // 10_000 = 100%
     uint256 public fees;
 
@@ -26,11 +27,20 @@ contract Invest {
 
     // Constructor: Called once on contract deployment
     // Check packages/foundry/deploy/Deploy.s.sol
-    constructor(address _owner, address _weth, address _router, uint256 _fees) {
+    constructor(
+        address _owner,
+        address _weth,
+        address _router,
+        address _nonfungiblePositionManager,
+        uint256 _fees
+    ) {
+        require(_fees < 100, "Fees can't be more than 1 %");
         owner = _owner;
         weth = IWETH(_weth);
         router = ISwapRouter02(_router);
-        require(_fees < 100, "Fees can't be more than 1 %");
+        nonfungiblePositionManager = INonfungiblePositionManager(
+            _nonfungiblePositionManager
+        );
         fees = _fees;
     }
 
@@ -38,8 +48,8 @@ contract Invest {
         address counterPart,
         uint256 amountOutMin,
         uint24 fee,
-        uint256 tickLower,
-        uint256 tickUpper
+        int24 tickLower,
+        int24 tickUpper
     ) public payable returns (uint256) {
         uint256 platformFees = 0;
         if (fees > 0) {
@@ -59,7 +69,17 @@ contract Invest {
             fee
         );
 
-        return 0;
+        (uint256 tokenId, , , ) = _mintNewPosition(
+            address(weth),
+            counterPart,
+            tickLower,
+            tickUpper,
+            fee,
+            amountInvested,
+            amountOutMin
+        );
+
+        return tokenId;
     }
 
     function InvestToken(
@@ -68,8 +88,8 @@ contract Invest {
         uint256 amountOutMin,
         address counterPart,
         uint24 fee,
-        uint256 tickLower,
-        uint256 tickUpper
+        int24 tickLower,
+        int24 tickUpper
     ) public returns (uint256) {
         IERC20(token).transferFrom(msg.sender, address(this), amount);
         uint256 platformFees = 0;
@@ -79,7 +99,7 @@ contract Invest {
         }
         uint256 amountInvested = amount - platformFees;
 
-         // swap necessary token
+        // swap necessary token
         _swapExactInputSingleHop(
             address(token),
             counterPart,
@@ -88,7 +108,17 @@ contract Invest {
             fee
         );
 
-        return 0;
+        (uint256 tokenId, , , ) = _mintNewPosition(
+            address(weth),
+            counterPart,
+            tickLower,
+            tickUpper,
+            fee,
+            amountInvested,
+            amountOutMin
+        );
+
+        return tokenId;
     }
 
     function _swapExactInputSingleHop(
@@ -112,6 +142,57 @@ contract Invest {
             });
 
         router.exactInputSingle(params);
+    }
+
+    /// @notice Calls the mint function defined in periphery, mints the same amount of each token. For this example we are providing 1000 DAI and 1000 USDC in liquidity
+    /// @return tokenId The id of the newly minted ERC721
+    /// @return liquidity The amount of liquidity for the position
+    /// @return amount0 The amount of token0
+    /// @return amount1 The amount of token1
+    function _mintNewPosition(
+        address token0,
+        address token1,
+        int24 tickLower,
+        int24 tickUpper,
+        uint24 fee,
+        uint256 amountToken0,
+        uint256 amountToken1
+    )
+        private
+        returns (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        IERC20(token0).transfer(
+            address(nonfungiblePositionManager),
+            amountToken1
+        );
+        IERC20(token1).transfer(
+            address(nonfungiblePositionManager),
+            amountToken1
+        );
+
+        INonfungiblePositionManager.MintParams
+            memory params = INonfungiblePositionManager.MintParams({
+                token0: token0,
+                token1: token1,
+                fee: fee,
+                tickLower: tickLower,
+                tickUpper: tickUpper,
+                amount0Desired: amountToken1,
+                amount1Desired: amountToken1,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: address(this),
+                deadline: block.timestamp
+            });
+
+        // Note that the pool defined by DAI/USDC and fee tier 0.3% must already be created and initialized in order to mint
+        (tokenId, liquidity, amount0, amount1) = nonfungiblePositionManager
+            .mint(params);
     }
 }
 
@@ -167,4 +248,50 @@ interface IERC20 {
 interface IWETH is IERC20 {
     function deposit() external payable;
     function withdraw(uint256 amount) external;
+}
+
+interface IUniswapV3Pool {
+    function mint(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount,
+        bytes calldata data
+    ) external returns (uint256 amount0, uint256 amount1);
+}
+
+interface IUniswapV3Factory {
+    function getPool(
+        address tokenA,
+        address tokenB,
+        uint24 fee
+    ) external view returns (address pool);
+}
+
+interface INonfungiblePositionManager {
+    struct MintParams {
+        address token0;
+        address token1;
+        uint24 fee;
+        int24 tickLower;
+        int24 tickUpper;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        address recipient;
+        uint256 deadline;
+    }
+
+    function mint(
+        MintParams calldata params
+    )
+        external
+        payable
+        returns (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        );
 }
