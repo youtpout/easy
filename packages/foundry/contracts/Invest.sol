@@ -44,7 +44,7 @@ contract Invest is EasyNFT {
         address _nonfungiblePositionManager,
         uint256 _fees
     ) EasyNFT(_owner) {
-        require(_fees < 100, "Fees can't be more than 1 %");
+        require(_fees < 101, "Fees can't be more than 1 %");
         weth = IWETH(_weth);
         router = ISwapRouter02(_router);
         nonfungiblePositionManager = INonfungiblePositionManager(
@@ -55,7 +55,7 @@ contract Invest is EasyNFT {
 
     function InvestNative(
         address counterPart,
-              uint256 amountIn,
+        uint256 amountIn,
         uint256 amountOutMin,
         uint24 fee,
         int24 tickLower,
