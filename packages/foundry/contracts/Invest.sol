@@ -124,6 +124,19 @@ contract Invest is EasyNFT {
 
         uint256 tokenId = safeMint(receiver, tokenIdPosition);
 
+        Investment memory investment = Investment(
+            address(weth),
+            counterPart,
+            receiver,
+            tokenId,
+            tokenIdPosition,
+            msg.value,
+            0
+        );
+
+        investments[tokenId] = investment;
+        userInvestments[receiver].push(tokenId);
+
         emit Invested(
             address(weth),
             receiver,
@@ -195,6 +208,19 @@ contract Invest is EasyNFT {
 
         uint256 tokenId = safeMint(receiver, tokenIdPosition);
 
+        Investment memory investment = Investment(
+            token,
+            counterPart,
+            receiver,
+            tokenId,
+            tokenIdPosition,
+            amountIn,
+            0
+        );
+
+        investments[tokenId] = investment;
+        userInvestments[receiver].push(tokenId);
+
         emit Invested(token, receiver, tokenId, tokenIdPosition, amount);
 
         collectedToken[tokenId] = address(token);
@@ -241,11 +267,10 @@ contract Invest is EasyNFT {
         _closePosition(tokenId, positionId, owner);
     }
 
-      function fetchInvestment(uint256 cursor, uint256 howMany)
-        external
-        view
-        returns (Investment[] memory values, uint256 newCursor)
-    {
+    function fetchInvestment(
+        uint256 cursor,
+        uint256 howMany
+    ) external view returns (Investment[] memory values, uint256 newCursor) {
         uint256 length = howMany;
         if (length > _nextTokenId - cursor) {
             length = _nextTokenId - cursor;
@@ -357,6 +382,8 @@ contract Invest is EasyNFT {
         } else {
             IERC20(tokenOut).transfer(receiver, amount);
         }
+
+        investments[tokenId].amountClosed = amount;
 
         emit Closed(tokenId, receiver, positionId, amount);
     }
