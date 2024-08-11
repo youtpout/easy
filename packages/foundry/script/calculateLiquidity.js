@@ -18,8 +18,7 @@ async function main() {
   // const sqrt = "1543922854351029034552027788781182";
 
   //  const pool = new Pool(token0, token1, fee,sqrt,);
-  const tickLower = -200;
-  const tickUpper = 100;
+
   const amount0 = '1000000000000000000'
   const useFullPrecision = true;
 
@@ -32,16 +31,18 @@ async function main() {
     provider
   );
 
-  const [slot0, liquidity] = await Promise.all([
+  const [slot0, liquidity, tickSpacing] = await Promise.all([
     poolContract.slot0(),
-    poolContract.liquidity()
+    poolContract.liquidity(),
+    poolContract.tickSpacing()
   ]);
 
   const sqrt = slot0.sqrtPriceX96.toString();
   const liq = liquidity.toString();
 
-  console.log("slot0", sqrt);
+  console.log("slot0", slot0);
   console.log("liquidity", liq);
+  console.log("sqrt", sqrt);
 
   const usdcWethPool = new Pool(
     usdc,
@@ -52,20 +53,24 @@ async function main() {
     slot0.tick
   )
 
-  // const tickLower2 = nearestUsableTick(slot0.tick, slot0.tickSpacing) -
-  //   poolInfo.tickSpacing * 2;
-  // const tickUpper2 = nearestUsableTick(slot0.tick, slot0.tickSpacing) +
-  //   poolInfo.tickSpacing * 2;
+  const tickLower = nearestUsableTick(slot0.tick, tickSpacing) -
+    100;
+  const tickUpper = nearestUsableTick(slot0.tick, tickSpacing) +
+    100;
 
-  const singleSidePositionToken0 = Position.fromAmount0({
+  console.log("tickLower", tickLower)
+  console.log("tickUpper", tickUpper)
+
+  const newliquidity = ethers.BigNumber.from('10000000000000000');
+  const position = new Position({
     pool: usdcWethPool,
+    liquidity: newliquidity,
     tickLower,
-    tickUpper,
-    amount0,
-    useFullPrecision
+    tickUpper
   });
 
-  console.log("singleSidePositionToken0", singleSidePositionToken0);
+  console.log(`Amount of Token0 needed: ${position.amount0.toSignificant(6)}`);
+  console.log(`Amount of Token1 needed: ${position.amount1.toSignificant(6)}`);
 
 }
 
