@@ -20,6 +20,20 @@ contract Invest is EasyNFT {
 
     mapping(uint256 => address) collectedToken;
 
+    // temporary, useful for retrieving information without indexing it
+    mapping(uint256 tokenId => Investment) investments;
+    mapping(address => uint256[]) userInvestments;
+
+    struct Investment {
+        address token;
+        address counterPart;
+        address investor;
+        uint256 tokenId;
+        uint256 positionId;
+        uint256 amount;
+        uint256 amountClosed;
+    }
+
     event Invested(
         address indexed token,
         address indexed investor,
@@ -225,6 +239,44 @@ contract Invest is EasyNFT {
         require(canClose, "Position stays active");
 
         _closePosition(tokenId, positionId, owner);
+    }
+
+      function fetchInvestment(uint256 cursor, uint256 howMany)
+        external
+        view
+        returns (Investment[] memory values, uint256 newCursor)
+    {
+        uint256 length = howMany;
+        if (length > _nextTokenId - cursor) {
+            length = _nextTokenId - cursor;
+        }
+
+        values = new Investment[](length);
+        for (uint256 i = 0; i < length; i++) {
+            values[i] = investments[cursor + i];
+        }
+
+        return (values, cursor + length);
+    }
+
+    function fetchInvestmentUser(
+        address user,
+        uint256 cursor,
+        uint256 howMany
+    ) external view returns (Investment[] memory values, uint256 newCursor) {
+        uint256 length = howMany;
+        uint256[] memory owned = userInvestments[user];
+        if (length > owned.length - cursor) {
+            length = owned.length - cursor;
+        }
+
+        values = new Investment[](length);
+        for (uint256 i = 0; i < length; i++) {
+            uint256 index = owned[cursor + i];
+            values[i] = investments[index];
+        }
+
+        return (values, cursor + length);
     }
 
     function _closePosition(

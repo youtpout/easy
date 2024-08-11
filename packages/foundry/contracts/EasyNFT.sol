@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract EasyNFT is ERC721, ERC721Burnable, Ownable, IERC721Receiver {
-    uint256 private _nextTokenId;
+    uint256 public _nextTokenId;
 
     mapping(uint256 => uint256) public linkedPosition;
 
