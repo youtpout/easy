@@ -56,6 +56,9 @@ contract InvestTest is Test {
         uint256 position = invest.linkedPosition(id);
         assertGt(position, 1);
         console.log("position", position);
+
+        vm.prank(alice);
+        invest.close(0);
     }
 
     function testInvestBtc() public {
@@ -85,5 +88,8 @@ contract InvestTest is Test {
         assertGt(position, 1);
         console.log("position", position);
         vm.stopPrank();
+
+        vm.prank(alice);
+        invest.close(0);
     }
 }

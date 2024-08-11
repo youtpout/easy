@@ -323,11 +323,11 @@ contract Invest is EasyNFT {
             uint256 feeGrowthInside1LastX128,
             uint128 tokensOwed0,
             uint128 tokensOwed1
-        ) = nonfungiblePositionManager.positions(tokenId);
+        ) = nonfungiblePositionManager.positions(positionId);
 
         INonfungiblePositionManager.CollectParams
             memory params = INonfungiblePositionManager.CollectParams({
-                tokenId: tokenId,
+                tokenId: positionId,
                 recipient: address(this),
                 amount0Max: type(uint128).max,
                 amount1Max: type(uint128).max
@@ -338,7 +338,7 @@ contract Invest is EasyNFT {
         INonfungiblePositionManager.DecreaseLiquidityParams
             memory paramsDecrease = INonfungiblePositionManager
                 .DecreaseLiquidityParams({
-                    tokenId: tokenId,
+                    tokenId: positionId,
                     liquidity: liquidity,
                     amount0Min: 0,
                     amount1Min: 0,
