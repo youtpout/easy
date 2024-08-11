@@ -18,7 +18,8 @@ async function main() {
   // const sqrt = "1543922854351029034552027788781182";
 
   //  const pool = new Pool(token0, token1, fee,sqrt,);
-  const amount1 = '1000000000000000000'
+
+  const amount0 = '1000000000000000000'
   const useFullPrecision = true;
 
   let provider = new ethers.providers.JsonRpcProvider("https://eth.llamarpc.com");
@@ -36,12 +37,12 @@ async function main() {
     poolContract.tickSpacing()
   ]);
 
-
   const sqrt = slot0.sqrtPriceX96.toString();
   const liq = liquidity.toString();
 
-  console.log("slot0", sqrt);
+  console.log("slot0", slot0);
   console.log("liquidity", liq);
+  console.log("sqrt", sqrt);
 
   const usdcWethPool = new Pool(
     usdc,
@@ -53,50 +54,24 @@ async function main() {
   )
 
   const tickLower = nearestUsableTick(slot0.tick, tickSpacing) -
-    1000;
+    100;
   const tickUpper = nearestUsableTick(slot0.tick, tickSpacing) +
-    1000;
+    100;
 
   console.log("tickLower", tickLower)
   console.log("tickUpper", tickUpper)
 
-  // Calculer le prix actuel de l'ETH en termes de USDC
-  const priceEthInUsdc = Math.pow(slot0.sqrtPriceX96 / Math.pow(2, 96), 2);
-  const ratio = Math.pow(10, 18) / Math.pow(10, 6);
-  const total = ratio / priceEthInUsdc;
-
-  console.log(`Actual eth price in the pool ${total.toFixed(6)} USDC`);
-
-  const singleSidePositionToken0 = Position.fromAmount1({
+  const newliquidity = ethers.BigNumber.from('10000000000000000');
+  const position = new Position({
     pool: usdcWethPool,
+    liquidity: newliquidity,
     tickLower,
-    tickUpper,
-    amount1,
-    useFullPrecision
+    tickUpper
   });
 
-  // Calculate the required USDC amount
-  const amountUsdcRequired = singleSidePositionToken0.amount0.toSignificant(6);
-  const amountEthUsed = singleSidePositionToken0.amount1.toSignificant(6);
+  console.log(`Amount of Token0 needed: ${position.amount0.toSignificant(6)}`);
+  console.log(`Amount of Token1 needed: ${position.amount1.toSignificant(6)}`);
 
-  console.log(`With 1 ETH, you would need approximately ${amountUsdcRequired} USDC to provide liquidity.`);
-  console.log(`This will use approximately ${amountEthUsed} ETH for the position.`);
-
-  const fromAmount = Position.fromAmounts({
-    pool: usdcWethPool,
-    tickLower,
-    tickUpper,
-    amount0: Math.pow(10, 17) * 5,
-    amount1: Math.pow(10, 6) * 1350,
-    useFullPrecision
-  });
-
-  const amountUsdc = fromAmount.amount0.toSignificant(6);
-  const amountEth = fromAmount.amount1.toSignificant(6);
-
-
-  console.log(`With 1 ETH, you would need approximately ${amountUsdc} USDC to provide liquidity.`);
-  console.log(`This will use approximately ${amountEth} ETH for the position.`);
 }
 
 main().catch((error) => {

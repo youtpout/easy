@@ -80,15 +80,33 @@ contract Invest is EasyNFT {
             fee
         );
 
-        (uint256 tokenIdPosition, , , ) = _mintNewPosition(
-            address(weth),
-            counterPart,
-            tickLower,
-            tickUpper,
-            fee,
-            amountInvested,
-            amountOutMin
+        uint256 amountWeth = IERC20(weth).balanceOf(address(this));
+        uint256 amountCounterPart = IERC20(counterPart).balanceOf(
+            address(this)
         );
+
+        uint256 tokenIdPosition;
+        if (address(weth) < counterPart) {
+            (tokenIdPosition, , , ) = _mintNewPosition(
+                address(weth),
+                counterPart,
+                tickLower,
+                tickUpper,
+                fee,
+                amountWeth,
+                amountCounterPart
+            );
+        } else {
+            (tokenIdPosition, , , ) = _mintNewPosition(
+                counterPart,
+                address(weth),
+                tickLower,
+                tickUpper,
+                fee,
+                amountCounterPart,
+                amountWeth
+            );
+        }
 
         uint256 tokenId = safeMint(receiver, tokenIdPosition);
 
@@ -133,15 +151,33 @@ contract Invest is EasyNFT {
             fee
         );
 
-        (uint256 tokenIdPosition, , , ) = _mintNewPosition(
-            token,
-            counterPart,
-            tickLower,
-            tickUpper,
-            fee,
-            amountInvested,
-            amountOutMin
+        uint256 amountToken = IERC20(token).balanceOf(address(this));
+        uint256 amountCounterPart = IERC20(counterPart).balanceOf(
+            address(this)
         );
+
+        uint256 tokenIdPosition;
+        if (token < counterPart) {
+            (tokenIdPosition, , , ) = _mintNewPosition(
+                token,
+                counterPart,
+                tickLower,
+                tickUpper,
+                fee,
+                amountToken,
+                amountCounterPart
+            );
+        } else {
+            (tokenIdPosition, , , ) = _mintNewPosition(
+                counterPart,
+                token,
+                tickLower,
+                tickUpper,
+                fee,
+                amountCounterPart,
+                amountToken
+            );
+        }
 
         uint256 tokenId = safeMint(receiver, tokenIdPosition);
 
@@ -287,7 +323,7 @@ contract Invest is EasyNFT {
                 tokenIn: tokenIn,
                 tokenOut: tokenOut,
                 fee: fee,
-                recipient: msg.sender,
+                recipient: address(this),
                 amountIn: amountIn,
                 amountOutMinimum: amountOutMin,
                 sqrtPriceLimitX96: 0
@@ -318,11 +354,11 @@ contract Invest is EasyNFT {
             uint256 amount1
         )
     {
-        IERC20(token0).transfer(
+        IERC20(token0).approve(
             address(nonfungiblePositionManager),
-            amountToken1
+            amountToken0
         );
-        IERC20(token1).transfer(
+        IERC20(token1).approve(
             address(nonfungiblePositionManager),
             amountToken1
         );
@@ -334,7 +370,7 @@ contract Invest is EasyNFT {
                 fee: fee,
                 tickLower: tickLower,
                 tickUpper: tickUpper,
-                amount0Desired: amountToken1,
+                amount0Desired: amountToken0,
                 amount1Desired: amountToken1,
                 amount0Min: 0,
                 amount1Min: 0,
