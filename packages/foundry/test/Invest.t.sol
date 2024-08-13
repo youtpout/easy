@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "../contracts/Invest.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 contract InvestTest is Test {
     Invest public invest;
@@ -29,13 +30,24 @@ contract InvestTest is Test {
     function setUp() public {
         vm.createSelectFork("mainnet");
         // addres for uniswap on ethereum, factory 0x1F98431c8aD98523631AE4a59f267346ea31F984
-        invest = new Invest(
-            deployer,
-            address(wEth),
-            0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,
-            0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
-            100
+        address implementation = address(new Invest());
+        bytes memory data = abi.encodeCall(
+            Invest.initialize,
+            (
+                deployer,
+                address(wEth),
+                0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45,
+                0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
+                100
+            )
         );
+        address proxy = Upgrades.deployTransparentProxy(
+            "Invest.sol:Invest",
+            deployer,
+            data
+        );
+
+        invest = Invest(proxy);
     }
 
     function testInvestNative() public {

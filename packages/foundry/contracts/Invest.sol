@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 // Useful for debugging. Remove when deploying to a live network.
 import "forge-std/console.sol";
 import "./EasyNFT.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /**
  * A smart contract that allows changing a state variable of the contract and tracking the changes
@@ -12,9 +13,9 @@ import "./EasyNFT.sol";
  */
 contract Invest is EasyNFT {
     // State Variables
-    IWETH public immutable weth;
-    ISwapRouter02 public immutable router;
-    INonfungiblePositionManager public immutable nonfungiblePositionManager;
+    IWETH public weth;
+    ISwapRouter02 public router;
+    INonfungiblePositionManager public nonfungiblePositionManager;
     // 10_000 = 100%
     uint256 public fees;
 
@@ -49,15 +50,18 @@ contract Invest is EasyNFT {
         uint256 amount
     );
 
-    // Constructor: Called once on contract deployment
-    // Check packages/foundry/deploy/Deploy.s.sol
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _owner,
         address _weth,
         address _router,
         address _nonfungiblePositionManager,
         uint256 _fees
-    ) EasyNFT(_owner) {
+    ) public initializer {
         require(_fees < 101, "Fees can't be more than 1 %");
         weth = IWETH(_weth);
         router = ISwapRouter02(_router);
@@ -65,6 +69,9 @@ contract Invest is EasyNFT {
             _nonfungiblePositionManager
         );
         fees = _fees;
+        __ERC721_init("EasyNFT", "EASY");
+        __ERC721Burnable_init();
+        __Ownable_init(_owner);
     }
 
     function InvestNative(
@@ -231,9 +238,7 @@ contract Invest is EasyNFT {
     function close(uint256 tokenId) external {
         address owner = ownerOf(tokenId);
         require(msg.sender == owner, "You can't close this position ");
-        uint256 positionId = linkedPosition[tokenId];
-
-        _closePosition(tokenId, positionId, owner);
+        _closePosition(tokenId, owner);
     }
 
     function botClose(uint256 tokenId) external {
@@ -264,7 +269,7 @@ contract Invest is EasyNFT {
 
         require(canClose, "Position stays active");
 
-        _closePosition(tokenId, positionId, owner);
+        _closePosition(tokenId, owner);
     }
 
     function fetchInvestment(
@@ -304,11 +309,7 @@ contract Invest is EasyNFT {
         return (values, cursor + length);
     }
 
-    function _closePosition(
-        uint256 tokenId,
-        uint256 positionId,
-        address receiver
-    ) private {
+    function _closePosition(uint256 tokenId, address receiver) private {
         uint256 positionId = linkedPosition[tokenId];
         (
             uint96 nonce,

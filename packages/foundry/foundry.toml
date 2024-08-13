@@ -4,6 +4,11 @@ out = 'out'
 libs = ['lib']
 fs_permissions = [{ access = "read-write", path = "./"}]
 viaIR = true
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+solc = "0.8.20"
 
 [rpc_endpoints]
 default_network = "http://127.0.0.1:8545"

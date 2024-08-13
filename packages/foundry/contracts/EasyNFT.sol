@@ -2,19 +2,33 @@
 // Compatible with OpenZeppelin Contracts ^5.0.0
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract EasyNFT is ERC721, ERC721Burnable, Ownable, IERC721Receiver {
+contract EasyNFT is
+    Initializable,
+    ERC721Upgradeable,
+    ERC721BurnableUpgradeable,
+    OwnableUpgradeable,
+    IERC721Receiver
+{
     uint256 public _nextTokenId;
 
     mapping(uint256 => uint256) public linkedPosition;
 
-    constructor(
-        address initialOwner
-    ) ERC721("EasyNFT", "EASY") Ownable(initialOwner) {}
+    /*   /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address initialOwner) public initializer {
+        __ERC721_init("EasyNFT", "EASY");
+        __ERC721Burnable_init();
+        __Ownable_init(initialOwner);
+    }*/
 
     function safeMint(
         address to,
