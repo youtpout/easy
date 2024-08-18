@@ -47,7 +47,7 @@ contract InvestTest is Test {
             data
         );
 
-        invest = Invest(proxy);
+        invest = Invest(payable(proxy));
     }
 
     function testInvestNative() public {

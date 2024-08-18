@@ -55,6 +55,10 @@ contract Invest is EasyNFT {
         _disableInitializers();
     }
 
+    receive() external payable {
+        require(msg.sender == address(weth), "Only weth can send ether");
+    }
+
     function initialize(
         address _owner,
         address _weth,
